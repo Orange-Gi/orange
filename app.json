@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "orange",
-    "slug": "orange",
+    "name": "同行",
+    "slug": "tongxing",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "orange",
+    "scheme": "tongxing",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
