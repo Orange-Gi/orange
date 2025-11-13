@@ -18,7 +18,11 @@ const FEEDBACK_OPTIONS = [
   { rating: 1, label: '需改进' },
 ];
 
-export const AssistantPanel: React.FC = () => {
+type AssistantPanelProps = {
+  contentWidth?: number;
+};
+
+export const AssistantPanel: React.FC<AssistantPanelProps> = ({ contentWidth }) => {
   const {
     state,
     assistant,
@@ -64,8 +68,17 @@ export const AssistantPanel: React.FC = () => {
     setFeedbackSubmitted(true);
   };
 
+  const containerStyle = useMemo(
+    () => [
+      styles.container,
+      styles.centered,
+      contentWidth ? { width: contentWidth, marginHorizontal: 0 } : undefined,
+    ],
+    [contentWidth],
+  );
+
   return (
-    <View style={styles.container}>
+    <View style={containerStyle}>
       <View style={[styles.header, { borderColor: modeMetadata.color }]}>
         <Text style={[styles.title, { color: modeMetadata.color }]}>
           {modeMetadata.title}助手
@@ -197,6 +210,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 3,
+  },
+  centered: {
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
