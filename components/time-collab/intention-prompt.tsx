@@ -1,10 +1,15 @@
-import React, { useCallback } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useRef } from 'react';
+import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 
 import { useUserCollabContext } from '@/contexts/user-collab-context';
 
-export const IntentionPrompt: React.FC = () => {
+type IntentionPromptProps = {
+  contentWidth?: number;
+};
+
+export const IntentionPrompt: React.FC<IntentionPromptProps> = ({ contentWidth }) => {
   const { state, setIntention } = useUserCollabContext();
+  const inputRef = useRef<TextInput>(null);
 
   const handleChange = useCallback(
     (value: string) => {
@@ -14,56 +19,46 @@ export const IntentionPrompt: React.FC = () => {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>今日愿望 / 意图</Text>
-      <Text style={styles.hint}>用一句话描述你想把剩余时间投入到哪里</Text>
+    <Pressable
+      style={[
+        styles.container,
+        contentWidth ? { width: contentWidth, alignSelf: 'center', marginHorizontal: 0 } : undefined,
+      ]}
+      onPress={() => inputRef.current?.focus()}>
       <TextInput
+        ref={inputRef}
         style={styles.input}
-        placeholder="例如：迭代协同文档初稿，重点补充案例"
+        placeholder="今日愿望 / 意图 · 用一句话描述你想把剩余时间投入到哪里"
         placeholderTextColor="#A0AEC0"
         multiline
         value={state.intention}
         onChangeText={handleChange}
         maxLength={200}
+        textAlignVertical="top"
       />
       <Text style={styles.counter}>{state.intention.length}/200</Text>
-    </View>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderRadius: 18,
-    marginHorizontal: 20,
     marginTop: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#3F3D56',
-  },
-  hint: {
-    fontSize: 13,
-    color: '#72738A',
-    marginTop: 6,
-    marginBottom: 12,
+    marginHorizontal: 20,
+    padding: 20,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.75)',
   },
   input: {
-    minHeight: 72,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    minHeight: 120,
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 22,
     color: '#1F2933',
   },
   counter: {
     fontSize: 12,
     color: '#8F8C9F',
-    marginTop: 8,
+    marginTop: 16,
     textAlign: 'right',
   },
 });

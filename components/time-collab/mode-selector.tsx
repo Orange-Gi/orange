@@ -8,17 +8,25 @@ import type { CollaborationMode, EnergyLevel } from '@/types/time-collab';
 const MODES: CollaborationMode[] = ['think', 'fast', 'rest'];
 const ENERGY_LEVELS: EnergyLevel[] = ['high', 'medium', 'low'];
 
+type ModeSelectorProps = {
+  contentWidth?: number;
+};
+
 const ENERGY_LABEL: Record<EnergyLevel, string> = {
   high: '高能',
   medium: '平稳',
   low: '疲惫',
 };
 
-export const ModeSelector: React.FC = () => {
+export const ModeSelector: React.FC<ModeSelectorProps> = ({ contentWidth }) => {
   const { state, setMode, setEnergyLevel } = useUserCollabContext();
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        contentWidth ? { width: contentWidth, alignSelf: 'center', marginHorizontal: 0 } : undefined,
+      ]}>
       <Text style={styles.label}>协同模式</Text>
       <Text style={styles.hint}>根据当前状态选择模式，助手会匹配不同节奏和语气</Text>
 
@@ -58,8 +66,8 @@ export const ModeSelector: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 20,
     marginTop: 20,
+    marginHorizontal: 20,
     padding: 20,
     borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.75)',

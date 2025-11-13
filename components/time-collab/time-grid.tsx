@@ -15,9 +15,8 @@ const GRID_WRAPPER_PADDING = 12;
 const STATS_BG = 'rgba(255, 255, 255, 0.5)';
 const MIN_CONTAINER_WIDTH = GRID_PADDING * 2 + GRID_GAP * 11 + 12 * 12;
 const LEGEND_ITEMS = [
-  { key: 'past', label: '已完成', color: '#AEC9A7', borderColor: '#98B38F' },
-  { key: 'current', label: '进行中', color: '#FFE066', borderColor: '#FFC107' },
-  { key: 'future', label: '待开始', color: 'transparent', borderColor: '#DAD7D0' },
+  { key: 'past', label: '已度过', color: '#AEC9A7', borderColor: '#98B38F' },
+  { key: 'future', label: '剩余', color: 'transparent', borderColor: '#DAD7D0' },
 ] as const;
 
 export const TimeGrid: React.FC<TimeGridProps> = ({ snapshot, contentWidth }) => {
@@ -43,10 +42,9 @@ export const TimeGrid: React.FC<TimeGridProps> = ({ snapshot, contentWidth }) =>
     <View style={[styles.container, { width: containerWidth, alignSelf: 'center' }]}>
       <View style={styles.header}>
         <Text style={styles.headline}>今日时间进度</Text>
-        <Text style={styles.timeLabel}>当前 {snapshot.currentTimeLabel}</Text>
       </View>
 
-      <View style={styles.statsRow}>
+      <View style={[styles.statsRow, { width: gridWidth }]}>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>已度过</Text>
           <Text style={styles.statValue}>{snapshot.pastBlocks}</Text>
@@ -107,21 +105,19 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 12,
+    alignItems: 'center',
   },
   headline: {
     fontSize: 20,
     fontWeight: '700',
     color: '#3F3D56',
-    marginBottom: 4,
-  },
-  timeLabel: {
-    fontSize: 14,
-    color: '#6C6A7C',
   },
   statsRow: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 16,
+    alignSelf: 'center',
+    justifyContent: 'center',
   },
   statCard: {
     flex: 1,
