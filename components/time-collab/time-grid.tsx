@@ -58,6 +58,7 @@ export const TimeGrid: React.FC<TimeGridProps> = ({ snapshot }) => {
                   key={`block-${block.index}`}
                   size={tileSize}
                   state={state}
+                  fillRatio={block.fillRatio}
                   style={{ marginRight: block.column === 11 ? 0 : GRID_GAP }}
                 />
               );
