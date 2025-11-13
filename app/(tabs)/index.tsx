@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  LayoutChangeEvent,
+  PanResponder,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -20,6 +22,8 @@ const TOTAL_ROWS = Math.ceil(TOTAL_BLOCKS / BLOCKS_PER_ROW);
 const GRID_PADDING = 24;
 const GRID_GAP = 6;
 const GRID_HEIGHT_RATIO = 0.5;
+const FATIGUE_WIDTH_RATIO = 0.382;
+const FATIGUE_THUMB_SIZE = 16;
 
 type ProgressSnapshot = {
   passedBlocks: number;
@@ -58,6 +62,8 @@ export default function HomeScreen() {
   const { width, height } = useWindowDimensions();
   const [progress, setProgress] = useState<ProgressSnapshot>(() => computeProgress());
   const [userInput, setUserInput] = useState('');
+  const [fatigue, setFatigue] = useState(0.5);
+  const [inputContentWidth, setInputContentWidth] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -99,15 +105,65 @@ export default function HomeScreen() {
     );
   }, [progress.currentBlockIndex, progress.passedBlocks]);
 
+  const sliderWidth = useMemo(
+    () => (inputContentWidth > 0 ? inputContentWidth * FATIGUE_WIDTH_RATIO : 0),
+    [inputContentWidth],
+  );
+
+  const updateFatigueFromPosition = useCallback(
+    (x: number) => {
+      if (sliderWidth <= 0) {
+        return;
+      }
+      const ratio = Math.min(1, Math.max(0, x / sliderWidth));
+      setFatigue(ratio);
+    },
+    [sliderWidth],
+  );
+
+  const fatiguePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => updateFatigueFromPosition(evt.nativeEvent.locationX),
+        onPanResponderMove: (evt) => updateFatigueFromPosition(evt.nativeEvent.locationX),
+        onPanResponderRelease: (evt) => updateFatigueFromPosition(evt.nativeEvent.locationX),
+        onPanResponderTerminationRequest: () => false,
+      }),
+    [updateFatigueFromPosition],
+  );
+
+  const handleDialogLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = Math.max(0, event.nativeEvent.layout.width - 40);
+    setInputContentWidth((prev) => {
+      if (Math.abs(prev - nextWidth) < 0.5) {
+        return prev;
+      }
+      return nextWidth;
+    });
+  }, []);
+
   const handleSend = useCallback(() => {
     router.push({
       pathname: '/guidance',
       params: {
         query: userInput.trim(),
+        fatigue: fatigue.toString(),
       },
     });
     setUserInput('');
-  }, [router, userInput]);
+  }, [router, userInput, fatigue]);
+
+  const fatiguePercent = useMemo(() => Math.round(fatigue * 100), [fatigue]);
+  const fatigueThumbTranslateX = useMemo(() => {
+    if (sliderWidth <= 0) {
+      return 0;
+    }
+    const maxOffset = Math.max(0, sliderWidth - FATIGUE_THUMB_SIZE);
+    const raw = sliderWidth * fatigue - FATIGUE_THUMB_SIZE / 2;
+    return Math.min(Math.max(raw, 0), maxOffset);
+  }, [sliderWidth, fatigue]);
 
   const currentFillPercent = useMemo(() => {
     const percent = Math.min(1, Math.max(0, progress.currentBlockProgress));
@@ -182,19 +238,52 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={[styles.dialog, sharedWidthStyle]}>
-        <TextInput
-          style={styles.dialogInput}
-          placeholder="告诉我你此刻的意图..."
-          placeholderTextColor="rgba(74, 93, 83, 0.4)"
-          value={userInput}
-          onChangeText={setUserInput}
-          multiline
-        />
-        <TouchableOpacity style={styles.sendButton} activeOpacity={0.9} onPress={handleSend}>
-          <Ionicons name="arrow-up-circle" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+        <View style={[styles.dialog, sharedWidthStyle]} onLayout={handleDialogLayout}>
+          <TextInput
+            style={styles.dialogInput}
+            placeholder="告诉我你此刻的意图..."
+            placeholderTextColor="rgba(74, 93, 83, 0.4)"
+            value={userInput}
+            onChangeText={setUserInput}
+            multiline
+            underlineColorAndroid="transparent"
+          />
+          <View
+            style={[
+              styles.fatigueBarWrapper,
+              sliderWidth > 0 ? { width: sliderWidth } : undefined,
+            ]}
+            {...fatiguePanResponder.panHandlers}>
+            <Text style={styles.fatigueLabel}>疲惫度 {fatiguePercent}%</Text>
+            <View style={styles.fatigueTrack}>
+              <View style={[styles.fatigueFill, { width: `${fatigue * 100}%` }]} />
+              <View
+                style={[
+                  styles.fatigueThumb,
+                  {
+                    transform: [
+                      {
+                        translateX: fatigueThumbTranslateX,
+                      },
+                    ],
+                  },
+                ]}
+              />
+            </View>
+          </View>
+
+          <View style={styles.actionCluster}>
+            <TouchableOpacity
+              style={styles.voiceButton}
+              activeOpacity={0.85}
+              onPress={() => {}}>
+              <Ionicons name="mic-outline" size={18} color="#4A5D53" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sendButton} activeOpacity={0.9} onPress={handleSend}>
+              <Ionicons name="paper-plane" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
     </SafeAreaView>
   );
 }
@@ -283,37 +372,92 @@ const styles = StyleSheet.create({
     color: '#4A5D53',
     textTransform: 'lowercase',
   },
-  dialog: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
-    alignSelf: 'center',
-    position: 'relative',
-    shadowColor: '#000000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  dialogInput: {
-    minHeight: 120,
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-    paddingRight: 72,
-    fontSize: 15,
-    color: '#4A5D53',
-    textAlignVertical: 'top',
-  },
-  sendButton: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#4A5D53',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    dialog: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 24,
+      alignSelf: 'center',
+      position: 'relative',
+      shadowColor: '#000000',
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    dialogInput: {
+      minHeight: 120,
+      paddingTop: 18,
+      paddingHorizontal: 20,
+      paddingBottom: 88,
+      paddingRight: 112,
+      fontSize: 15,
+      color: '#4A5D53',
+      textAlignVertical: 'top',
+    },
+    fatigueBarWrapper: {
+      position: 'absolute',
+      left: 20,
+      bottom: 24,
+    },
+    fatigueLabel: {
+      fontSize: 11,
+      color: '#708178',
+      marginBottom: 6,
+      letterSpacing: 0.2,
+    },
+    fatigueTrack: {
+      width: '100%',
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: 'rgba(74, 93, 83, 0.15)',
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    fatigueFill: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: '#4A5D53',
+    },
+    fatigueThumb: {
+      position: 'absolute',
+      top: -5,
+      width: FATIGUE_THUMB_SIZE,
+      height: FATIGUE_THUMB_SIZE,
+      borderRadius: FATIGUE_THUMB_SIZE / 2,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#4A5D53',
+      shadowColor: '#000000',
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+    },
+    actionCluster: {
+      position: 'absolute',
+      right: 20,
+      bottom: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    voiceButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: '#F5F0E4',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    sendButton: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: '#4A5D53',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 });
