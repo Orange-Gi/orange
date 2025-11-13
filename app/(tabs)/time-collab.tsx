@@ -9,7 +9,7 @@ import { useUserCollabContext } from '@/contexts/user-collab-context';
 import { useDailyGrid } from '@/hooks/useDailyGrid';
 
 export default function TimeCollabScreen() {
-  const { snapshot } = useDailyGrid(30_000);
+  const { snapshot } = useDailyGrid(4_000);
   const { entries, state } = useUserCollabContext();
 
   return (

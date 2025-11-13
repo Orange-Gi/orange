@@ -12,6 +12,7 @@ export type GridBlock = {
   isCurrent: boolean;
   isFuture: boolean;
   startMinuteOfDay: number;
+  fillRatio: number;
 };
 
 export type DailyGridSnapshot = {
@@ -23,22 +24,38 @@ export type DailyGridSnapshot = {
   remainingMinutes: number;
   currentTimeLabel: string;
   rows: GridBlock[][];
+  currentBlockProgress: number;
+  currentBlockStartMinute: number;
 };
 
-const getMinutesSinceMidnight = (date: Date) => date.getHours() * 60 + date.getMinutes();
+const getMinutesSinceMidnight = (date: Date) =>
+  date.getHours() * 60 +
+  date.getMinutes() +
+  date.getSeconds() / 60 +
+  date.getMilliseconds() / 60_000;
 
 const buildSnapshot = (date: Date): DailyGridSnapshot => {
   const minutesSinceMidnight = getMinutesSinceMidnight(date);
-  const pastBlocks = Math.min(TOTAL_BLOCKS, Math.floor(minutesSinceMidnight / MINUTES_PER_BLOCK));
-  const currentBlockIndex = Math.min(TOTAL_BLOCKS - 1, pastBlocks);
+  const totalMinutes = TOTAL_BLOCKS * MINUTES_PER_BLOCK;
+  const clampedMinutes = Math.min(minutesSinceMidnight, totalMinutes);
+  const pastBlocks = Math.min(TOTAL_BLOCKS, Math.floor(clampedMinutes / MINUTES_PER_BLOCK));
+  const currentBlockIndex = Math.min(TOTAL_BLOCKS - 1, Math.max(0, pastBlocks));
   const futureBlocks = Math.max(0, TOTAL_BLOCKS - pastBlocks);
-  const elapsedMinutes = Math.min(minutesSinceMidnight, TOTAL_BLOCKS * MINUTES_PER_BLOCK);
-  const remainingMinutes = Math.max(0, TOTAL_BLOCKS * MINUTES_PER_BLOCK - minutesSinceMidnight);
+  const elapsedMinutes = Math.floor(clampedMinutes);
+  const remainingMinutes = Math.max(0, Math.ceil(totalMinutes - clampedMinutes));
+  const currentBlockStartMinute = currentBlockIndex * MINUTES_PER_BLOCK;
+  const currentBlockProgress =
+    pastBlocks >= TOTAL_BLOCKS
+      ? 1
+      : Math.min(
+          1,
+          Math.max(0, (clampedMinutes - currentBlockStartMinute) / MINUTES_PER_BLOCK),
+        );
 
   const blocks: GridBlock[] = Array.from({ length: TOTAL_BLOCKS }, (_, index) => {
     const startMinuteOfDay = index * MINUTES_PER_BLOCK;
     const isPast = index < pastBlocks;
-    const isCurrent = index === currentBlockIndex;
+    const isCurrent = index === currentBlockIndex && pastBlocks < TOTAL_BLOCKS;
     const isFuture = index > pastBlocks;
 
     return {
@@ -49,6 +66,7 @@ const buildSnapshot = (date: Date): DailyGridSnapshot => {
       isCurrent,
       isFuture,
       startMinuteOfDay,
+      fillRatio: isPast ? 1 : isCurrent ? currentBlockProgress : 0,
     };
   });
 
@@ -68,6 +86,8 @@ const buildSnapshot = (date: Date): DailyGridSnapshot => {
     elapsedMinutes,
     remainingMinutes,
     currentTimeLabel: `${hours}:${minutes}`,
+    currentBlockProgress,
+    currentBlockStartMinute,
   };
 };
 
