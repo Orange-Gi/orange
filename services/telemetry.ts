@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { getJSON, setJSONThrottled } from '@/utils/storage';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL;
@@ -22,9 +24,13 @@ class TelemetryClient {
   private queue: TelemetryEvent[] = [];
   private flushing = false;
   private retry: RetryPolicy = { attempts: 0, nextDelay: 1000 };
+  private readonly canPersist =
+    Platform.OS !== 'web' || typeof window !== 'undefined';
 
   constructor() {
-    void this.restore();
+    if (this.canPersist) {
+      void this.restore();
+    }
   }
 
   track<TPayload extends Record<string, unknown>>(name: TelemetryEventName, payload: TPayload) {
@@ -36,7 +42,9 @@ class TelemetryClient {
     };
 
     this.queue.push(event);
-    setJSONThrottled(STORAGE_KEY, this.queue);
+    if (this.canPersist) {
+      setJSONThrottled(STORAGE_KEY, this.queue);
+    }
 
     if (API_BASE && USE_MOCKS === false) {
       void this.flush();
@@ -51,7 +59,9 @@ class TelemetryClient {
     if (!API_BASE || USE_MOCKS) {
       // mock 情况下直接清空队列。
       this.queue = [];
-      setJSONThrottled(STORAGE_KEY, this.queue);
+      if (this.canPersist) {
+        setJSONThrottled(STORAGE_KEY, this.queue);
+      }
       return;
     }
 
@@ -71,7 +81,9 @@ class TelemetryClient {
       }
 
       this.queue = [];
-      setJSONThrottled(STORAGE_KEY, this.queue);
+      if (this.canPersist) {
+        setJSONThrottled(STORAGE_KEY, this.queue);
+      }
       this.retry = { attempts: 0, nextDelay: 1000 };
     } catch (error) {
       console.warn('[telemetry] flush failed, scheduling retry', error);
@@ -90,6 +102,10 @@ class TelemetryClient {
   }
 
   private async restore() {
+    if (!this.canPersist) {
+      return;
+    }
+
     const stored = await getJSON<TelemetryEvent[]>(STORAGE_KEY);
     if (stored?.length) {
       this.queue = stored;
