@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  PanResponder,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -25,12 +24,9 @@ const GRID_HEIGHT_RATIO = 0.5;
 type ProgressSnapshot = {
   passedBlocks: number;
   leftBlocks: number;
-  elapsedMinutes: number;
-  remainingMinutes: number;
-  currentTimeLabel: string;
   currentBlockIndex: number | null;
   secondsIntoCurrentBlock: number;
-  currentBlockElapsedLabel: string;
+  currentBlockProgress: number;
 };
 
 const computeProgress = (): ProgressSnapshot => {
@@ -38,31 +34,22 @@ const computeProgress = (): ProgressSnapshot => {
   const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
   const passedBlocks = Math.min(TOTAL_BLOCKS, Math.floor(minutesSinceMidnight / MINUTES_PER_BLOCK));
   const leftBlocks = TOTAL_BLOCKS - passedBlocks;
-  const elapsedMinutes = Math.min(minutesSinceMidnight, TOTAL_MINUTES);
-  const remainingMinutes = Math.max(0, TOTAL_MINUTES - minutesSinceMidnight);
   const seconds = now.getSeconds();
   const withinDay = minutesSinceMidnight < TOTAL_MINUTES;
   const currentBlockIndex = withinDay ? Math.min(TOTAL_BLOCKS - 1, passedBlocks) : null;
   const secondsIntoCurrentBlock = withinDay
     ? (minutesSinceMidnight % MINUTES_PER_BLOCK) * 60 + seconds
     : 0;
-  const elapsedMinutesWithinBlock = Math.floor(secondsIntoCurrentBlock / 60);
-  const elapsedSecondsWithinBlock = secondsIntoCurrentBlock % 60;
-
-  const hours = now.getHours().toString().padStart(2, '0');
-  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const currentBlockProgress = withinDay
+    ? Math.min(1, secondsIntoCurrentBlock / (MINUTES_PER_BLOCK * 60))
+    : 1;
 
   return {
     passedBlocks,
     leftBlocks,
-    elapsedMinutes,
-    remainingMinutes,
-    currentTimeLabel: `${hours}:${minutes}`,
     currentBlockIndex,
     secondsIntoCurrentBlock,
-    currentBlockElapsedLabel: withinDay
-      ? `${elapsedMinutesWithinBlock}分${elapsedSecondsWithinBlock.toString().padStart(2, '0')}秒`
-      : '已完成',
+    currentBlockProgress,
   };
 };
 
@@ -70,10 +57,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const [progress, setProgress] = useState<ProgressSnapshot>(() => computeProgress());
-  const [fatigueValue, setFatigueValue] = useState(0.4);
   const [userInput, setUserInput] = useState('');
-  const [sliderWidth, setSliderWidth] = useState(0);
-  const trackWidthRef = useRef(1);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -96,31 +80,12 @@ export default function HomeScreen() {
     return Math.max(Math.min(sizeByWidth, sizeByHeight), 0);
   }, [width, height]);
 
-  const updateFatigueFromPosition = useCallback(
-    (positionX: number) => {
-      if (trackWidthRef.current <= 0) {
-        return;
-      }
-      const ratio = Math.min(1, Math.max(0, positionX / trackWidthRef.current));
-      setFatigueValue(ratio);
-    },
-    [setFatigueValue],
-  );
-
-  const sliderPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (event) => {
-          updateFatigueFromPosition(event.nativeEvent.locationX);
-        },
-        onPanResponderMove: (event) => {
-          updateFatigueFromPosition(event.nativeEvent.locationX);
-        },
-      }),
-    [updateFatigueFromPosition],
-  );
+  const gridWidth = useMemo(() => {
+    if (blockSize <= 0) {
+      return 0;
+    }
+    return blockSize * BLOCKS_PER_ROW + GRID_GAP * (BLOCKS_PER_ROW - 1);
+  }, [blockSize]);
 
   const rows = useMemo(() => {
     const blocks = Array.from({ length: TOTAL_BLOCKS }, (_, index) => {
@@ -134,18 +99,22 @@ export default function HomeScreen() {
     );
   }, [progress.currentBlockIndex, progress.passedBlocks]);
 
-  const fatiguePercent = Math.round(fatigueValue * 100);
-
   const handleSend = useCallback(() => {
     router.push({
       pathname: '/guidance',
       params: {
         query: userInput.trim(),
-        fatigue: fatigueValue.toFixed(2),
       },
     });
     setUserInput('');
-  }, [fatigueValue, router, userInput]);
+  }, [router, userInput]);
+
+  const currentFillPercent = useMemo(() => {
+    const percent = Math.min(1, Math.max(0, progress.currentBlockProgress));
+    return `${percent * 100}%`;
+  }, [progress.currentBlockProgress]);
+
+  const sharedWidthStyle = gridWidth > 0 ? { width: gridWidth } : undefined;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -159,14 +128,12 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.timeInfoRow}>
-          <Text style={styles.timeLabel}>当前时间 · {progress.currentTimeLabel}</Text>
-          {progress.currentBlockIndex !== null && (
-            <Text style={styles.blockElapsed}>当前格已过去 {progress.currentBlockElapsedLabel}</Text>
-          )}
-        </View>
-
-        <View style={[styles.gridContainer, { maxHeight: height * GRID_HEIGHT_RATIO }]}>
+        <View
+          style={[
+            styles.gridContainer,
+            sharedWidthStyle,
+            { maxHeight: height * GRID_HEIGHT_RATIO },
+          ]}>
           {rows.map((row, rowIndex) => (
             <View
               key={`row-${rowIndex}`}
@@ -192,9 +159,9 @@ export default function HomeScreen() {
                       isCurrent && styles.gridBlockCurrent,
                     ]}>
                     {isCurrent && (
-                      <Text style={styles.gridBlockCurrentText}>
-                        {progress.currentBlockElapsedLabel}
-                      </Text>
+                      <View
+                        style={[styles.gridBlockCurrentFill, { width: currentFillPercent }]}
+                      />
                     )}
                   </View>
                 );
@@ -203,14 +170,10 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <View style={styles.legendRow}>
+        <View style={[styles.legendRow, sharedWidthStyle]}>
           <View style={styles.legendItem}>
             <View style={[styles.legendSwatch, styles.legendSwatchPassed]} />
             <Text style={styles.legendLabel}>passed</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendSwatch, styles.legendSwatchCurrent]} />
-            <Text style={styles.legendLabel}>current</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendSwatch, styles.legendSwatchLeft]} />
@@ -219,8 +182,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={styles.dialog}>
-        <Text style={styles.dialogTitle}>思考？斋戒？还是等待。</Text>
+      <View style={[styles.dialog, sharedWidthStyle]}>
         <TextInput
           style={styles.dialogInput}
           placeholder="告诉我你此刻的意图..."
@@ -229,40 +191,9 @@ export default function HomeScreen() {
           onChangeText={setUserInput}
           multiline
         />
-
-        <View style={styles.dialogFooter}>
-          <View style={styles.energySection}>
-            <Text style={styles.energyLabel}>疲惫度 {fatiguePercent}%</Text>
-            <View
-              style={styles.sliderTrack}
-              onLayout={(event) => {
-                const widthValue = event.nativeEvent.layout.width;
-                trackWidthRef.current = widthValue;
-                setSliderWidth(widthValue);
-              }}
-              {...sliderPanResponder.panHandlers}>
-              <View style={[styles.sliderFill, { width: sliderWidth * fatigueValue }]} />
-              <View
-                style={[
-                  styles.sliderThumb,
-                  { transform: [{ translateY: -10 }, { translateX: sliderWidth * fatigueValue - 10 }] },
-                ]}
-              />
-            </View>
-          </View>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
-              <Ionicons name="mic-outline" size={22} color="#4A5D53" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.iconButton, styles.sendButton]}
-              activeOpacity={0.9}
-              onPress={handleSend}>
-              <Ionicons name="arrow-up-circle" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <TouchableOpacity style={styles.sendButton} activeOpacity={0.9} onPress={handleSend}>
+          <Ionicons name="arrow-up-circle" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -284,23 +215,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: GRID_PADDING,
-    paddingTop: 12,
-  },
-  timeInfoRow: {
-    marginBottom: 12,
-  },
-  timeLabel: {
-    fontSize: 14,
-    color: '#4A5D53',
-    marginBottom: 6,
-  },
-  blockElapsed: {
-    fontSize: 13,
-    color: '#6E7F76',
+    paddingVertical: 24,
   },
   gridContainer: {
     justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 24,
   },
   gridRow: {
     flexDirection: 'row',
@@ -309,8 +233,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     borderColor: '#B9C6BB',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#FFFFFF',
   },
   gridBlockPassed: {
     backgroundColor: '#AEC9A7',
@@ -319,28 +244,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0E4',
   },
   gridBlockCurrent: {
-    backgroundColor: '#FFE3B3',
-    borderColor: '#F0A500',
-    shadowColor: '#F0A500',
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderColor: '#87C090',
   },
-  gridBlockCurrentText: {
-    fontSize: 10,
-    color: '#4A5D53',
-    fontWeight: '600',
+  gridBlockCurrentFill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: '#CDE8CE',
   },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     marginTop: 16,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: 16,
   },
   legendSwatch: {
     width: 16,
@@ -353,10 +275,6 @@ const styles = StyleSheet.create({
   legendSwatchPassed: {
     backgroundColor: '#AEC9A7',
   },
-  legendSwatchCurrent: {
-    backgroundColor: '#FFE3B3',
-    borderColor: '#F0A500',
-  },
   legendSwatchLeft: {
     backgroundColor: '#F5F0E4',
   },
@@ -367,85 +285,35 @@ const styles = StyleSheet.create({
   },
   dialog: {
     backgroundColor: '#FFFFFF',
-    margin: 16,
-    marginTop: 24,
-    padding: 16,
     borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    alignSelf: 'center',
+    position: 'relative',
     shadowColor: '#000000',
     shadowOpacity: 0.08,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 4,
   },
-  dialogTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#4A5D53',
-    marginBottom: 12,
-  },
   dialogInput: {
-    minHeight: 60,
-    maxHeight: 120,
-    borderRadius: 14,
-    backgroundColor: '#F6F1E6',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
+    minHeight: 120,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    paddingRight: 72,
+    fontSize: 15,
     color: '#4A5D53',
     textAlignVertical: 'top',
   },
-  dialogFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 16,
-  },
-  energySection: {
-    flex: 1,
-    marginRight: 12,
-  },
-  energyLabel: {
-    fontSize: 13,
-    color: '#4A5D53',
-    marginBottom: 6,
-  },
-  sliderTrack: {
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E6DDD0',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  sliderFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#D2B48C',
-  },
-  sliderThumb: {
-    position: 'absolute',
-    top: 16,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#4A5D53',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E6DDD0',
-    marginLeft: 8,
-  },
   sendButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#4A5D53',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

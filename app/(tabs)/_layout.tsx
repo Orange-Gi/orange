@@ -16,13 +16,6 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
-        <Tabs.Screen
-          name="time-collab"
-          options={{
-            title: '协同',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="sparkles" color={color} />,
-          }}
-        />
       <Tabs.Screen
         name="index"
         options={{
