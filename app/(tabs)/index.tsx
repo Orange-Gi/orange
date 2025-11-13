@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
 const TOTAL_BLOCKS = 144;
 const MINUTES_PER_BLOCK = 10;
@@ -39,6 +40,7 @@ const computeProgress = (): ProgressSnapshot => {
 };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { width, height } = useWindowDimensions();
   const [progress, setProgress] = useState<ProgressSnapshot>(() => computeProgress());
 
@@ -76,6 +78,19 @@ export default function HomeScreen() {
         <Text style={styles.title}>同行</Text>
         <Text style={styles.subtitle}>把一天分成 144 个 10 分钟方块</Text>
       </View>
+
+        <TouchableOpacity
+          style={styles.promoCard}
+          activeOpacity={0.9}
+          onPress={() => router.push('/(tabs)/time-collab')}>
+          <View>
+            <Text style={styles.promoTitle}>与 AI 协同安排余下时间</Text>
+            <Text style={styles.promoDescription}>
+              查看 12×12 时间网格，记录今日意图，选择思考/斋戒/等待模式，获得专属助手建议。
+            </Text>
+          </View>
+          <Text style={styles.promoCta}>立即体验 →</Text>
+        </TouchableOpacity>
 
       <View style={styles.statsRow}>
         <View style={[styles.statCard, styles.statCardFirst]}>
@@ -143,6 +158,35 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#6E7F76',
+  },
+  promoCard: {
+    marginHorizontal: GRID_PADDING,
+    marginBottom: 20,
+    backgroundColor: '#4A5D53',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  promoTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  promoDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 20,
+  },
+  promoCta: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFE066',
   },
   statsRow: {
     flexDirection: 'row',
