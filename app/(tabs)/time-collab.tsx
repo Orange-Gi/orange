@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { AssistantPanel } from '@/components/time-collab/assistant-panel';
 import { IntentionPrompt } from '@/components/time-collab/intention-prompt';
@@ -9,6 +9,13 @@ import { useUserCollabContext } from '@/contexts/user-collab-context';
 import { useDailyGrid } from '@/hooks/useDailyGrid';
 
 export default function TimeCollabScreen() {
+  const { width } = useWindowDimensions();
+  const GRID_MIN_WIDTH = 12 * 12 + 6 * 11 + 20 * 2;
+  const MAX_CONTENT_WIDTH = 720;
+  const HORIZONTAL_GUTTER = 40;
+  const estimatedWidth = Math.max(width - HORIZONTAL_GUTTER, GRID_MIN_WIDTH);
+  const contentWidth = Math.min(estimatedWidth, MAX_CONTENT_WIDTH, width);
+
   const { snapshot } = useDailyGrid(4_000);
   const { entries, state } = useUserCollabContext();
 
@@ -22,10 +29,10 @@ export default function TimeCollabScreen() {
           </Text>
         </View>
 
-        <TimeGrid snapshot={snapshot} />
+        <TimeGrid snapshot={snapshot} contentWidth={contentWidth} />
         <IntentionPrompt />
         <ModeSelector />
-        <AssistantPanel />
+        <AssistantPanel contentWidth={contentWidth} />
 
         <View style={styles.archive}>
           <View style={styles.archiveHeader}>

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 type GridTileState = 'past' | 'current' | 'future';
 
@@ -12,50 +12,14 @@ type GridTileProps = {
 };
 
 export const GridTile: React.FC<GridTileProps> = ({ size, state, fillRatio = 0, onPress, style }) => {
-  const animatedScale = useRef(new Animated.Value(state === 'current' ? 1 : 0)).current;
-  const initialFill = state === 'past' ? 1 : state === 'current' ? fillRatio : 0;
-  const animatedFill = useRef(new Animated.Value(initialFill)).current;
-
-  useEffect(() => {
-    if (state !== 'current') {
-      animatedScale.stopAnimation();
-      animatedScale.setValue(0);
-      return;
-    }
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(animatedScale, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(animatedScale, {
-          toValue: 0.5,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-  }, [animatedScale, state]);
-
-  useEffect(() => {
-    const target = state === 'past' ? 1 : state === 'current' ? Math.max(0, Math.min(fillRatio, 1)) : 0;
-
-    Animated.timing(animatedFill, {
-      toValue: target,
-      duration: state === 'current' ? 800 : 200,
-      useNativeDriver: false,
-    }).start();
-  }, [animatedFill, fillRatio, state]);
-
+  const normalizedFill = useMemo(() => Math.max(0, Math.min(fillRatio, 1)), [fillRatio]);
   const borderColor = state === 'past' ? '#98B38F' : state === 'current' ? '#FFC107' : '#DAD7D0';
   const containerBackground =
     state === 'future' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.12)';
   const fillColor = state === 'past' ? '#AEC9A7' : state === 'current' ? '#FFE066' : 'transparent';
 
   const content = (
-    <Animated.View
+    <View
       style={[
         styles.tile,
         {
@@ -63,34 +27,20 @@ export const GridTile: React.FC<GridTileProps> = ({ size, state, fillRatio = 0, 
           height: size,
           borderColor,
           backgroundColor: containerBackground,
-          transform:
-            state === 'current'
-              ? [
-                  {
-                    scale: animatedScale.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 1.08],
-                    }),
-                  },
-                ]
-              : undefined,
         },
         style,
       ]}>
-      <Animated.View
+      <View
         pointerEvents="none"
         style={[
           styles.fill,
           {
             backgroundColor: fillColor,
-            width: animatedFill.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, size],
-            }),
+            width: size * normalizedFill,
           },
         ]}
       />
-    </Animated.View>
+    </View>
   );
 
   if (onPress) {
