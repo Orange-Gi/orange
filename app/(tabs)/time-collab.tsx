@@ -30,8 +30,8 @@ export default function TimeCollabScreen() {
         </View>
 
         <TimeGrid snapshot={snapshot} contentWidth={contentWidth} />
-        <IntentionPrompt />
-        <ModeSelector />
+        <IntentionPrompt contentWidth={contentWidth} />
+        <ModeSelector contentWidth={contentWidth} />
         <AssistantPanel contentWidth={contentWidth} />
 
         <View style={styles.archive}>

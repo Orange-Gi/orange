@@ -13,10 +13,14 @@ type GridTileProps = {
 
 export const GridTile: React.FC<GridTileProps> = ({ size, state, fillRatio = 0, onPress, style }) => {
   const normalizedFill = useMemo(() => Math.max(0, Math.min(fillRatio, 1)), [fillRatio]);
-  const borderColor = state === 'past' ? '#98B38F' : state === 'current' ? '#FFC107' : '#DAD7D0';
+  const borderColor = state === 'past' ? '#98B38F' : state === 'current' ? '#78B678' : '#DAD7D0';
   const containerBackground =
-    state === 'future' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.12)';
-  const fillColor = state === 'past' ? '#AEC9A7' : state === 'current' ? '#FFE066' : 'transparent';
+    state === 'future'
+      ? 'rgba(255,255,255,0.3)'
+      : state === 'current'
+        ? 'transparent'
+        : 'rgba(255,255,255,0.12)';
+  const fillColor = state === 'past' ? '#AEC9A7' : state === 'current' ? '#CDEBCD' : 'transparent';
 
   const content = (
     <View
