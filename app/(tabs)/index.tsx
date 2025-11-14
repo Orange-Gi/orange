@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutChangeEvent,
   PanResponder,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -10,9 +11,14 @@ import {
   TouchableOpacity,
   View,
   useWindowDimensions,
+  type DimensionValue,
+  type StyleProp,
+  type TextStyle,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+
+import { useFocusMode } from '@/contexts/focus-mode-context';
 
 const TOTAL_BLOCKS = 144;
 const MINUTES_PER_BLOCK = 10;
@@ -59,11 +65,24 @@ const computeProgress = (): ProgressSnapshot => {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { isFocusMode, setFocusMode, toggleFocusMode } = useFocusMode();
   const { width, height } = useWindowDimensions();
   const [progress, setProgress] = useState<ProgressSnapshot>(() => computeProgress());
   const [userInput, setUserInput] = useState('');
   const [fatigue, setFatigue] = useState(0.5);
   const [inputContentWidth, setInputContentWidth] = useState(0);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  const dialogInputWebStyle = useMemo<StyleProp<TextStyle>>(() => {
+    if (Platform.OS !== 'web') {
+      return undefined;
+    }
+    return {
+      outlineStyle: 'none',
+      outlineWidth: 0,
+      outlineColor: 'transparent',
+    } as unknown as TextStyle;
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -165,88 +184,111 @@ export default function HomeScreen() {
     return Math.min(Math.max(raw, 0), maxOffset);
   }, [sliderWidth, fatigue]);
 
-  const currentFillPercent = useMemo(() => {
+  const currentFillPercent = useMemo<DimensionValue>(() => {
     const percent = Math.min(1, Math.max(0, progress.currentBlockProgress));
     return `${percent * 100}%`;
   }, [progress.currentBlockProgress]);
 
   const sharedWidthStyle = gridWidth > 0 ? { width: gridWidth } : undefined;
 
+  useEffect(
+    () => () => {
+      setFocusMode(false);
+    },
+    [setFocusMode],
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.avatarButton}
-          activeOpacity={0.8}
-          onPress={() => router.push('/modal?intent=login')}>
-          <Ionicons name="person-circle-outline" size={36} color="#4A5D53" />
-        </TouchableOpacity>
-      </View>
+      {!isFocusMode && (
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            style={styles.avatarButton}
+            activeOpacity={0.8}
+            onPress={() => router.push('/modal?intent=login')}>
+            <Ionicons name="person-circle-outline" size={36} color="#4A5D53" />
+          </TouchableOpacity>
+        </View>
+      )}
 
-      <View style={styles.content}>
-        <View
+      <View style={[styles.content, isFocusMode && styles.contentFocus]}>
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={toggleFocusMode}
           style={[
-            styles.gridContainer,
+            styles.gridTouchable,
             sharedWidthStyle,
             { maxHeight: height * GRID_HEIGHT_RATIO },
+            isFocusMode && styles.gridTouchableFocus,
           ]}>
-          {rows.map((row, rowIndex) => (
-            <View
-              key={`row-${rowIndex}`}
-              style={[
-                styles.gridRow,
-                { marginBottom: rowIndex === TOTAL_ROWS - 1 ? 0 : GRID_GAP },
-              ]}>
-              {row.map((status, columnIndex) => {
-                const isLastInRow = columnIndex === BLOCKS_PER_ROW - 1;
-                const isCurrent = status === 'current';
-                return (
-                  <View
-                    key={`block-${rowIndex}-${columnIndex}`}
-                    style={[
-                      styles.gridBlock,
-                      {
-                        width: blockSize,
-                        height: blockSize,
-                        marginRight: isLastInRow ? 0 : GRID_GAP,
-                      },
-                      status === 'passed' && styles.gridBlockPassed,
-                      status === 'left' && styles.gridBlockLeft,
-                      isCurrent && styles.gridBlockCurrent,
-                    ]}>
-                    {isCurrent && (
-                      <View
-                        style={[styles.gridBlockCurrentFill, { width: currentFillPercent }]}
-                      />
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+          <View style={[styles.gridContainer, isFocusMode && styles.gridContainerFocus]}>
+            {rows.map((row, rowIndex) => (
+              <View
+                key={`row-${rowIndex}`}
+                style={[
+                  styles.gridRow,
+                  { marginBottom: rowIndex === TOTAL_ROWS - 1 ? 0 : GRID_GAP },
+                ]}>
+                {row.map((status, columnIndex) => {
+                  const isLastInRow = columnIndex === BLOCKS_PER_ROW - 1;
+                  const isCurrent = status === 'current';
+                  return (
+                    <View
+                      key={`block-${rowIndex}-${columnIndex}`}
+                      style={[
+                        styles.gridBlock,
+                        {
+                          width: blockSize,
+                          height: blockSize,
+                          marginRight: isLastInRow ? 0 : GRID_GAP,
+                        },
+                        status === 'passed' && styles.gridBlockPassed,
+                        status === 'left' && styles.gridBlockLeft,
+                        isCurrent && styles.gridBlockCurrent,
+                      ]}>
+                      {isCurrent && (
+                        <View
+                          style={[styles.gridBlockCurrentFill, { width: currentFillPercent }]}
+                        />
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        </TouchableOpacity>
 
-        <View style={[styles.legendRow, sharedWidthStyle]}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendSwatch, styles.legendSwatchPassed]} />
-            <Text style={styles.legendLabel}>passed</Text>
+        {!isFocusMode && (
+          <View style={[styles.legendRow, sharedWidthStyle]}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendSwatch, styles.legendSwatchPassed]} />
+              <Text style={styles.legendLabel}>passed</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendSwatch, styles.legendSwatchLeft]} />
+              <Text style={styles.legendLabel}>left</Text>
+            </View>
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendSwatch, styles.legendSwatchLeft]} />
-            <Text style={styles.legendLabel}>left</Text>
-          </View>
-        </View>
+        )}
       </View>
 
+      {!isFocusMode && (
         <View style={[styles.dialog, sharedWidthStyle]} onLayout={handleDialogLayout}>
           <TextInput
-            style={styles.dialogInput}
-            placeholder="告诉我你此刻的意图..."
+            style={[
+              styles.dialogInput,
+              isInputFocused && styles.dialogInputFocused,
+              dialogInputWebStyle,
+            ]}
+            placeholder="思考，斋戒，还是等待..."
             placeholderTextColor="rgba(74, 93, 83, 0.4)"
             value={userInput}
             onChangeText={setUserInput}
             multiline
             underlineColorAndroid="transparent"
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
           />
           <View
             style={[
@@ -280,10 +322,11 @@ export default function HomeScreen() {
               <Ionicons name="mic-outline" size={18} color="#4A5D53" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.sendButton} activeOpacity={0.9} onPress={handleSend}>
-              <Ionicons name="paper-plane" size={20} color="#FFFFFF" />
+              <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -309,11 +352,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: GRID_PADDING,
     paddingVertical: 24,
   },
+  contentFocus: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   gridContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
+  },
+  gridContainerFocus: {
+    marginBottom: 0,
+  },
+  gridTouchable: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridTouchableFocus: {
+    flex: 1,
   },
   gridRow: {
     flexDirection: 'row',
@@ -333,20 +390,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F0E4',
   },
   gridBlockCurrent: {
-    borderColor: '#87C090',
+    borderColor: '#AEC9A7',
+    backgroundColor: '#F5F0E4',
   },
   gridBlockCurrentFill: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: '#CDE8CE',
+    backgroundColor: '#AEC9A7',
   },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: 8,
   },
   legendItem: {
     flexDirection: 'row',
@@ -372,92 +430,111 @@ const styles = StyleSheet.create({
     color: '#4A5D53',
     textTransform: 'lowercase',
   },
-    dialog: {
-      backgroundColor: '#FFFFFF',
-      borderRadius: 20,
-      padding: 20,
-      marginBottom: 24,
-      alignSelf: 'center',
-      position: 'relative',
-      shadowColor: '#000000',
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 4,
-    },
-    dialogInput: {
-      minHeight: 120,
-      paddingTop: 18,
-      paddingHorizontal: 20,
-      paddingBottom: 88,
-      paddingRight: 112,
-      fontSize: 15,
-      color: '#4A5D53',
-      textAlignVertical: 'top',
-    },
-    fatigueBarWrapper: {
-      position: 'absolute',
-      left: 20,
-      bottom: 24,
-    },
-    fatigueLabel: {
-      fontSize: 11,
-      color: '#708178',
-      marginBottom: 6,
-      letterSpacing: 0.2,
-    },
-    fatigueTrack: {
-      width: '100%',
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: 'rgba(74, 93, 83, 0.15)',
-      overflow: 'hidden',
-      position: 'relative',
-    },
-    fatigueFill: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-      left: 0,
-      backgroundColor: '#4A5D53',
-    },
-    fatigueThumb: {
-      position: 'absolute',
-      top: -5,
-      width: FATIGUE_THUMB_SIZE,
-      height: FATIGUE_THUMB_SIZE,
-      borderRadius: FATIGUE_THUMB_SIZE / 2,
-      backgroundColor: '#FFFFFF',
-      borderWidth: 1,
-      borderColor: '#4A5D53',
-      shadowColor: '#000000',
-      shadowOpacity: 0.08,
-      shadowRadius: 4,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 3,
-    },
-    actionCluster: {
-      position: 'absolute',
-      right: 20,
-      bottom: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    voiceButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: '#F5F0E4',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
-    },
-    sendButton: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: '#4A5D53',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+  dialog: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    alignSelf: 'center',
+    position: 'relative',
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  dialogInput: {
+    minHeight: 96,
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 72,
+    paddingRight: 96,
+    fontSize: 15,
+    color: '#4A5D53',
+    textAlignVertical: 'top',
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  dialogInputFocused: {
+    borderWidth: 0,
+  },
+  fatigueBarWrapper: {
+    position: 'absolute',
+    left: 20,
+    bottom: 18,
+  },
+  fatigueLabel: {
+    fontSize: 11,
+    color: '#708178',
+    marginBottom: 6,
+    letterSpacing: 0.2,
+  },
+  fatigueTrack: {
+    width: '100%',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(74, 93, 83, 0.15)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  fatigueFill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: '#4A5D53',
+  },
+  fatigueThumb: {
+    position: 'absolute',
+    top: -5,
+    width: FATIGUE_THUMB_SIZE,
+    height: FATIGUE_THUMB_SIZE,
+    borderRadius: FATIGUE_THUMB_SIZE / 2,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#4A5D53',
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  actionCluster: {
+    position: 'absolute',
+    right: 18,
+    bottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  voiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F0E4',
+    borderWidth: 1,
+    borderColor: 'rgba(74, 93, 83, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  sendButton: {
+    paddingHorizontal: 18,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4A5D53',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
 });

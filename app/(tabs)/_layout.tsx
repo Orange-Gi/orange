@@ -5,9 +5,11 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useFocusMode } from '@/contexts/focus-mode-context';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { isFocusMode } = useFocusMode();
 
   return (
     <Tabs
@@ -15,6 +17,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: isFocusMode ? { display: 'none' } : undefined,
       }}>
       <Tabs.Screen
         name="index"
